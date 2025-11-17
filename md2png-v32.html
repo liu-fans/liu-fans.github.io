@@ -1,0 +1,1135 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Markdown 转图片工具 - 支持公式、画布设置与本地模板</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/github-markdown-css/5.2.0/github-markdown.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css">
+    <!-- 添加 KaTeX 数学公式支持 -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/4.3.0/marked.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: linear-gradient(135deg, #f5f7fa 0%, #e4edf9 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        header {
+            text-align: center;
+            margin: 20px 0;
+            padding: 15px;
+        }
+        
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+/*            background: linear-gradient(90deg, #4b6cb7 0%, #182848 100%);*/
+/*            -webkit-background-clip: text;*/
+            background-clip: text;
+/*            color: transparent;*/
+            font-weight: 800;
+        }
+        
+        .subtitle {
+            color: #666;
+            font-size: 1.1rem;
+            max-width: 700px;
+            margin: 0 auto 20px;
+        }
+        
+        .settings-container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.08);
+            padding: 20px;
+            margin-bottom: 25px;
+        }
+        
+        .settings-title {
+            font-size: 1.3rem;
+            margin-bottom: 15px;
+            color: #2c3e50;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .settings-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+        }
+        
+        .setting-item {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .setting-label {
+            margin-bottom: 5px;
+            font-weight: 500;
+            color: #495057;
+        }
+        
+        .setting-input {
+            padding: 8px 12px;
+            border: 1px solid #ced4da;
+            border-radius: 6px;
+            font-size: 1rem;
+            transition: border-color 0.3s;
+        }
+        
+        .setting-input:focus {
+            border-color: #4b6cb7;
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(75, 108, 183, 0.2);
+        }
+
+        /* === 修改：将标题和正文字体分开控制 === */
+        .markdown-body {
+            /* 正文基础字体大小由用户设置控制 */
+            font-size: 16px; /* 这个值会被JS动态修改 */
+            margin: 0.2em 0 0.2em 0 !important;
+            line-height: 1.1em;
+        }
+
+        .markdown-body ul li,
+        .markdown-body ol li {
+            line-height: 1.1em !important;
+            margin: 0.1em 0 0.1em 0 !important;
+        }        
+        
+        /* === 关键：自定义标题字体大小 === */
+        .markdown-body h1 {
+            font-size: 1.3em !important;     /* 对比基础字号 */
+            margin: 0.2em 0 0.2em 0 !important;
+
+            font-weight: 700 !important;
+            color: #1a1a1a !important;
+        }
+        
+        .markdown-body h2 {
+            font-size: 1.1em !important;     /* 对比基础字号 */
+            margin: 0.2em 0 0.2em 0 !important;
+
+            font-weight: 600 !important;
+/*            color: #2c3e50 !important;*/
+        }
+        
+        .markdown-body h3 {
+            font-size: 1.0em !important;     /* 对比基础字号 */
+            margin: 0.2em 0 0.2em 0 !important;
+
+            font-weight: 600 !important;
+/*            color: #34495e !important;*/
+        }
+        
+        .markdown-body h4 {
+            font-size: 0.9em !important;     /* 对比基础字号 */
+            margin: 0.2em 0 0.2em 0 !important;
+            font-weight: 600 !important;
+/*            color: #4a6572 !important;*/
+        }
+        
+        .markdown-body h5 {
+            font-size: 0.8em !important;     /* 对比基础字号 */
+            margin: 0.2em 0 0.2em 0 !important;
+            font-weight: 600 !important;
+/*            color: #5d6d7e !important;*/
+        }
+        
+        .markdown-body h6 {
+            font-size: 0.6em !important;     /* 对比基础字号 */
+            margin: 0.2em 0 0.1em 0 !important;
+            font-weight: 600 !important;
+/*            color: #7f8c8d !important;*/
+            text-transform: uppercase !important;
+            letter-spacing: 0.5px !important;
+        }
+        
+        /* 标题间距优化 */
+        .markdown-body h1 + h2,
+        .markdown-body h2 + h3,
+        .markdown-body h3 + h4,
+        .markdown-body h4 + h5,
+        .markdown-body h5 + h6 {
+            margin-top: 0.5em !important;
+        }
+
+        /* 确保标题内容可见 */
+        .markdown-body h1 *,
+        .markdown-body h2 *,
+        .markdown-body h3 *,
+        .markdown-body h4 *,
+        .markdown-body h5 *,
+        .markdown-body h6 * {
+            color: inherit !important;
+            background: transparent !important;
+        }
+
+
+
+        .main-content {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 25px;
+            margin-bottom: 30px;
+        }
+        
+        .editor-container {
+            flex: 1;
+            min-width: 300px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+            overflow: hidden;
+        }
+        
+        .preview-container {
+            flex: 0 0 400px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .preview-header {
+            padding: 15px 20px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .preview-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #2c3e50;
+        }
+        
+        .preview-size {
+            font-size: 0.9rem;
+            color: #6c757d;
+            background: #e9ecef;
+            padding: 3px 8px;
+            border-radius: 4px;
+        }
+        
+        .preview-frame {
+            flex: 1;
+            min-height: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 15px;
+            background: #f8f9fa;
+            overflow: hidden;
+        }
+        
+        .preview-canvas {
+            background: #ffffff;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            border-radius: 6px;
+            overflow: hidden;
+            transform-origin: top left;
+            transition: transform 0.3s;
+        }
+        
+        .preview-content {
+            padding: 30px;
+            min-height: 400px;
+            overflow: auto;
+        }
+        
+        .panel-header {
+            padding: 15px 20px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .panel-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #2c3e50;
+        }
+        
+        textarea {
+            width: 100%;
+            height: 100%;
+            min-height: 400px;
+            border: none;
+            padding: 20px;
+            font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+            font-size: 16px;
+            line-height: 1.5;
+            resize: vertical;
+            outline: none;
+            transition: box-shadow 0.3s;
+        }
+        
+        textarea:focus {
+            box-shadow: 0 0 0 3px rgba(75, 108, 183, 0.2);
+        }
+        
+        .action-container {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin: 20px 0;
+            flex-wrap: wrap;
+        }
+        
+        .btn {
+            padding: 12px 28px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+        
+        .btn-primary {
+            background: linear-gradient(90deg, #4b6cb7 0%, #182848 100%);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 15px rgba(75, 108, 183, 0.4);
+        }
+        
+        .btn-secondary {
+            background: #e9ecef;
+            color: #495057;
+        }
+        
+        .btn-secondary:hover {
+            background: #dee2e6;
+            transform: translateY(-2px);
+        }
+        
+        .btn:active {
+            transform: translateY(0);
+        }
+        
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        
+        .image-result {
+            margin-top: 30px;
+            text-align: center;
+        }
+        
+        .result-title {
+            font-size: 1.4rem;
+            margin-bottom: 15px;
+            color: #2c3e50;
+        }
+        
+        #result-image {
+            max-width: 100%;
+            border-radius: 8px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+            border: 1px solid #eee;
+            display: none;
+        }
+        
+        .status {
+            margin-top: 10px;
+            font-size: 0.95rem;
+            color: #6c757d;
+            min-height: 24px;
+        }
+        
+        .sample-btn {
+            background: none;
+            border: 1px solid #4b6cb7;
+            color: #4b6cb7;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .sample-btn:hover {
+            background: #4b6cb7;
+            color: white;
+        }
+        
+        /* 分栏样式 */
+        .columns {
+            display: flex;
+            gap: 2px;
+            margin: 1px 0;
+            flex-wrap: wrap;
+        }
+        
+        .column {
+            flex: 1;
+            min-width: 250px;
+            padding: 1px;
+            background: #ffffff;
+            border-radius: 1px;
+            box-shadow: none;
+            border: 1px solid #eee;  // 可选：添加边框保持边界清晰
+            /* box-shadow: 0 2px 4px rgba(0,0,0,0.1); */
+        }
+        
+        /* 模板区域样式 */
+        .template-section {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.08);
+            padding: 20px;
+            margin: 30px 0 20px;
+        }
+        
+        .template-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .template-title {
+            font-size: 1.3rem;
+            color: #2c3e50;
+            margin: 0;
+        }
+        
+        .template-controls {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .template-file-input {
+            display: none;
+        }
+        
+        .template-preview {
+            height: 480px;
+            overflow-y: auto;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 15px;
+            font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+            font-size: 14px;
+            line-height: 1.1;
+            background: #f8f9fa;
+            margin-bottom: 15px;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        
+        .template-status {
+            font-size: 0.9rem;
+            color: #6c757d;
+            margin-top: 5px;
+        }
+        
+        .tips-section {
+            background: #e3f2fd;
+            border-left: 4px solid #2196f3;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 0 8px 8px 0;
+        }
+        
+        .tips-title {
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #0d47a1;
+        }
+        
+        .tips-list {
+            padding-left: 20px;
+        }
+        
+        .tips-list li {
+            margin-bottom: 5px;
+        }
+        
+        @media (max-width: 900px) {
+            .preview-container {
+                flex: 1;
+                min-width: 300px;
+            }
+            
+            .main-content {
+                flex-direction: column;
+            }
+            
+            .template-controls {
+                flex-direction: column;
+            }
+        }
+        
+        @media (max-width: 768px) {
+            h1 {
+                font-size: 2rem;
+            }
+            
+            .settings-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .columns {
+                flex-direction: column;
+            }
+            
+            .column {
+                min-width: 100%;
+            }
+        }
+        
+        .canvas-preview {
+            width: 100%;
+            height: 100%;
+            min-height: 300px;
+            overflow: auto;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        #canvas-content {
+            background: white;
+            position: relative;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Markdown 转图片工具</h1>
+            <p class="subtitle">支持数学公式、分栏布局、自定义画布尺寸和本地模板加载，完全在浏览器中运行</p>
+            <div class="action-container">
+                <button class="btn btn-secondary sample-btn" id="load-sample">加载示例</button>
+                <button class="btn btn-secondary" id="clear-all">清空内容</button>
+                <button class="btn btn-secondary" id="reset-settings">重置设置</button>
+            </div>
+        </header>
+        
+        <div class="settings-container">
+            <div class="settings-title">🎨 画布与显示设置</div>
+            <div class="settings-grid">
+                <div class="setting-item">
+                    <label class="setting-label">画布宽度 (px)</label>
+                    <input type="number" id="canvas-width" class="setting-input" value="800" min="300" max="2000">
+                </div>
+                <div class="setting-item">
+                    <label class="setting-label">画布高度 (px)</label>
+                    <input type="number" id="canvas-height" class="setting-input" value="480" min="200" max="2000">
+                </div>
+                <div class="setting-item">
+                    <label class="setting-label">字体大小 (px)</label>
+                    <input type="number" id="font-size" class="setting-input" value="16" min="10" max="30">
+                </div>
+                <div class="setting-item">
+                    <label class="setting-label">内边距 (px)</label>
+                    <input type="number" id="padding" class="setting-input" value="10" min="2" max="20">
+                </div>
+                <div class="setting-item">
+                    <label class="setting-label">背景颜色</label>
+                    <input type="color" id="bg-color" class="setting-input" value="#ffffff">
+                </div>
+                <div class="setting-item">
+                    <label class="setting-label">边框圆角 (px)</label>
+                    <input type="number" id="border-radius" class="setting-input" value="1" min="0" max="5">
+                </div>
+            </div>
+        </div>
+        
+        <div class="main-content">
+            <div class="editor-container">
+                <div class="panel-header">
+                    <div class="panel-title">Markdown 编辑器</div>
+                </div>
+                <textarea id="markdown-input" placeholder="在此输入 Markdown 内容..."></textarea>
+            </div>
+            
+            <div class="preview-container">
+                <div class="preview-header">
+                    <div class="preview-title">画布预览 (800×480)</div>
+                    <div class="preview-size" id="current-dimensions">800 × 480 px</div>
+                </div>
+                <div class="canvas-preview">
+                    <div id="canvas-content">
+                        <div id="preview-content" class="markdown-body" style="padding: 30px; font-size: 16px;"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="action-container">
+            <button class="btn btn-primary" id="convert-btn">
+                <span>生成图片</span>
+            </button>
+            <button class="btn btn-secondary" id="download-btn" disabled>
+                <span>下载图片</span>
+            </button>
+        </div>
+        
+        <div class="status" id="status"></div>
+        
+        <div class="image-result">
+            <h2 class="result-title">生成的图片</h2>
+            <img id="result-image" alt="Markdown 预览图片">
+        </div>
+        
+        <!-- 模板加载区域 -->
+        <div class="template-section">
+            <div class="template-header">
+                <h2 class="template-title">📂 本地模板加载</h2>
+                <div class="template-controls">
+                    <label class="btn btn-secondary" for="template-file-input">
+                        <span>📁 选择模板文件</span>
+                    </label>
+                    <input type="file" id="template-file-input" class="template-file-input" accept=".md,.txt">
+                    <button class="btn btn-secondary" id="load-template-btn" disabled>
+                        <span>加载模板</span>
+                    </button>
+                </div>
+            </div>
+            <div class="template-preview" id="template-preview">选择一个 .md 或 .txt 文件查看内容...</div>
+            <div class="template-status" id="template-status">无文件选中</div>
+        </div>
+        
+        <div class="tips-section">
+            <div class="tips-title">💡 使用技巧</div>
+            <ul class="tips-list">
+                <li>使用 <code><div class="columns"></code> 创建分栏，栏内可自由使用所有 Markdown 语法</li>
+                <li>数学公式：行内公式用 <code>$E=mc^2$</code>，块级公式用 <code>$$\\int_{-\\infty}^{\\infty} e^{-x^2} dx = \\sqrt{\\pi}$$</code></li>
+                <li>通过本地模板文件快速加载常用格式</li>
+                <li>所有功能完全在浏览器中运行，无需上传任何数据</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        // 初始化变量
+        let generatedImage = null;
+        let contentScale = 1;
+        let selectedTemplateContent = '';
+        
+        // DOM 元素
+        const markdownInput = document.getElementById('markdown-input');
+        const previewContent = document.getElementById('preview-content');
+        const canvasContent = document.getElementById('canvas-content');
+        const convertBtn = document.getElementById('convert-btn');
+        const downloadBtn = document.getElementById('download-btn');
+        const resultImage = document.getElementById('result-image');
+        const statusEl = document.getElementById('status');
+        const loadSampleBtn = document.getElementById('load-sample');
+        const clearAllBtn = document.getElementById('clear-all');
+        const resetSettingsBtn = document.getElementById('reset-settings');
+        const canvasWidthInput = document.getElementById('canvas-width');
+        const canvasHeightInput = document.getElementById('canvas-height');
+        const fontSizeInput = document.getElementById('font-size');
+        const paddingInput = document.getElementById('padding');
+        const bgColorInput = document.getElementById('bg-color');
+        const borderRadiusInput = document.getElementById('border-radius');
+        const currentDimensionsEl = document.getElementById('current-dimensions');
+        const templateFileInput = document.getElementById('template-file-input');
+        const templatePreview = document.getElementById('template-preview');
+        const templateStatus = document.getElementById('template-status');
+        const loadTemplateBtn = document.getElementById('load-template-btn');
+        
+        // 设置变更监听
+        canvasWidthInput.addEventListener('change', updateCanvasSettings);
+        canvasHeightInput.addEventListener('change', updateCanvasSettings);
+        fontSizeInput.addEventListener('change', updateCanvasSettings);
+        paddingInput.addEventListener('change', updateCanvasSettings);
+        bgColorInput.addEventListener('change', updateCanvasSettings);
+        borderRadiusInput.addEventListener('change', updateCanvasSettings);
+        
+        // 模板文件选择监听
+        templateFileInput.addEventListener('change', handleTemplateFileSelect);
+        loadTemplateBtn.addEventListener('click', loadTemplateToEditor);
+        
+        // 配置 marked 解析器
+        marked.setOptions({
+            highlight: function(code, lang) {
+                const language = hljs.getLanguage(lang) ? lang : 'plaintext';
+                return hljs.highlight(code, { language }).value;
+            },
+            breaks: true,
+            gfm: true,
+            sanitize: false
+        });
+        
+        // 更新画布设置
+        function updateCanvasSettings() {
+            const width = parseInt(canvasWidthInput.value);
+            const height = parseInt(canvasHeightInput.value);
+            const fontSize = parseInt(fontSizeInput.value);
+            const padding = parseInt(paddingInput.value);
+            const bgColor = bgColorInput.value;
+            const borderRadius = parseInt(borderRadiusInput.value);
+            
+            // 更新预览尺寸显示
+            currentDimensionsEl.textContent = `${width} × ${height} px`;
+            
+            // 应用样式到预览区域
+            canvasContent.style.width = `${width}px`;
+            canvasContent.style.height = `${height}px`;
+            canvasContent.style.backgroundColor = bgColor;
+            canvasContent.style.borderRadius = `${borderRadius}px`;
+            
+            previewContent.style.fontSize = `${fontSize}px`;
+            previewContent.style.padding = `${padding}px`;
+            
+            // 重新渲染预览
+            renderPreview();
+            
+            // 调整内容以适应画布
+            adjustContentToFit();
+        }
+        
+        // 调整内容以适应画布
+        function adjustContentToFit() {
+            const width = parseInt(canvasWidthInput.value);
+            const height = parseInt(canvasHeightInput.value);
+            const padding = parseInt(paddingInput.value) * 2;
+            
+            // 获取内容的实际尺寸
+            const contentWidth = previewContent.scrollWidth;
+            const contentHeight = previewContent.scrollHeight;
+            
+            // 计算缩放比例
+            const scaleX = (width - padding - 20) / contentWidth;
+            const scaleY = (height - padding - 20) / contentHeight;
+            
+            // 选择较小的比例，确保内容完整显示
+            contentScale = Math.min(1, Math.min(scaleX, scaleY, 1.5));
+            
+            // 应用缩放
+            previewContent.style.transform = `scale(${contentScale})`;
+            previewContent.style.transformOrigin = 'top left';
+            
+            // 调整容器以适应缩放后的内容
+            canvasContent.style.display = 'flex';
+            canvasContent.style.justifyContent = 'center';
+            canvasContent.style.alignItems = 'flex-start';
+            canvasContent.style.paddingTop = `${(height - contentHeight * contentScale) / 2}px`;
+        }
+        
+        // 实时预览
+        function renderPreview() {
+            const markdownText = markdownInput.value;
+            const htmlContent = marked.parse(markdownText);
+            previewContent.innerHTML = htmlContent;
+
+            // // 处理图片跨域问题
+            // const images = previewContent.querySelectorAll('img');
+            // images.forEach(img => {
+            //     // 设置crossOrigin属性以避免跨域问题
+            //     if (!img.src.startsWith('data:') && !img.src.startsWith('blob:')) {
+            //         img.crossOrigin = 'anonymous';
+            //     }
+            // });
+
+            
+            // 先执行代码高亮
+            hljs.highlightAll();
+            
+            // 然后渲染数学公式
+            setTimeout(() => {
+                renderMathInElement(previewContent, {
+                    delimiters: [
+                        {left: '$$', right: '$$', display: true},
+                        {left: '$', right: '$', display: false},
+                        {left: '\\(', right: '\\)', display: false},
+                        {left: '\\[', right: '\\]', display: true}
+                    ],
+                    ignoredTags: ['script', 'noscript', 'style', 'textarea', 'pre']
+                });
+                
+                // 调整内容以适应画布
+                adjustContentToFit();
+            }, 100);
+        }
+        
+        // 生成图片
+        async function convertToImage() {
+            setStatus('正在生成图片，请稍候...');
+            convertBtn.disabled = true;
+            convertBtn.innerHTML = '<span>生成中...</span>';
+            
+            try {
+                // 应用当前设置
+                const width = parseInt(canvasWidthInput.value);
+                const height = parseInt(canvasHeightInput.value);
+                const fontSize = parseInt(fontSizeInput.value);
+                const padding = parseInt(paddingInput.value);
+                const bgColor = bgColorInput.value;
+                const borderRadius = parseInt(borderRadiusInput.value);
+                
+                // 创建一个临时容器用于截图
+                const tempContainer = document.createElement('div');
+                tempContainer.style.width = `${width}px`;
+                tempContainer.style.height = `${height}px`;
+                tempContainer.style.padding = '0';
+                tempContainer.style.margin = '0';
+                tempContainer.style.backgroundColor = bgColor;
+                tempContainer.style.borderRadius = `${borderRadius}px`;
+                tempContainer.style.overflow = 'hidden';
+                tempContainer.style.position = 'fixed';
+                tempContainer.style.left = '-9999px';
+                tempContainer.style.top = '-9999px';
+                tempContainer.style.fontFamily = 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
+                
+                // 创建内容容器
+                const contentContainer = document.createElement('div');
+                contentContainer.className = 'markdown-body';
+                contentContainer.style.padding = `${padding}px`;
+                contentContainer.style.fontSize = `${fontSize}px`;
+                contentContainer.style.width = '100%';
+                contentContainer.style.height = '100%';
+                contentContainer.style.boxSizing = 'border-box';
+                contentContainer.style.overflow = 'hidden';
+                contentContainer.style.lineHeight = '1.6';
+                
+                // 复制预览内容
+                contentContainer.innerHTML = previewContent.innerHTML;
+                
+                // // 处理临时容器中的图片
+                // const tempImages = contentContainer.querySelectorAll('img');
+                // for (let img of tempImages) {
+                //     // 检查是否为跨域图片
+                //     if (!img.src.startsWith('data:') && 
+                //         !img.src.startsWith('blob:') && 
+                //         !img.src.startsWith(window.location.origin)) {
+                        
+                //         // 如果是跨域图片，尝试设置crossOrigin
+                //         img.crossOrigin = 'anonymous';
+                        
+                //         // 等待图片加载完成
+                //         try {
+                //             await new Promise((resolve, reject) => {
+                //                 const timeout = setTimeout(() => reject(new Error('图片加载超时')), 5000);
+                //                 img.onload = () => {
+                //                     clearTimeout(timeout);
+                //                     resolve();
+                //                 };
+                //                 img.onerror = () => {
+                //                     clearTimeout(timeout);
+                //                     // 如果图片加载失败，移除该图片元素
+                //                     img.remove();
+                //                     resolve();
+                //                 };
+                //             });
+                //         } catch (e) {
+                //             console.warn('图片加载失败:', img.src, e);
+                //             img.remove(); // 移除加载失败的图片
+                //         }
+                //     }
+                // }
+
+
+                // 将内容容器添加到临时容器
+                tempContainer.appendChild(contentContainer);
+                
+                // 将临时容器添加到 body
+                document.body.appendChild(tempContainer);
+                
+                // 等待内容渲染
+                await new Promise(resolve => setTimeout(resolve, 100));
+                
+                // 使用 html2canvas 生成图片
+                const canvas = await html2canvas(tempContainer, {
+                    scale: 2,
+                    useCORS: true,
+                    logging: false,
+                    backgroundColor: null,
+                    width: width,
+                    height: height
+                    // allowTaint: false, // 关键：不允许污染
+                    // onclone: function(clonedDoc) {
+                    //     // 在克隆文档中处理图片
+                    //     const clonedImages = clonedDoc.querySelectorAll('img');
+                    //     clonedImages.forEach(img => {
+                    //         if (!img.src.startsWith('data:') && 
+                    //             !img.src.startsWith('blob:')) {
+                    //             img.crossOrigin = 'anonymous';
+                    //         }
+                    //     });
+                    // }
+
+                });
+                
+                // 移除临时容器
+                document.body.removeChild(tempContainer);
+                
+                // 调整画布到实际尺寸
+                const finalCanvas = document.createElement('canvas');
+                finalCanvas.width = width;
+                finalCanvas.height = height;
+                const ctx = finalCanvas.getContext('2d');
+                ctx.drawImage(canvas, 0, 0, width, height);
+                
+                // 转换为图片
+                generatedImage = finalCanvas.toDataURL('image/png');
+                resultImage.src = generatedImage;
+                resultImage.style.display = 'inline-block';
+                resultImage.style.width = `${width}px`;
+                resultImage.style.height = `${height}px`;
+                resultImage.style.maxWidth = '100%';
+                
+                // 启用下载按钮
+                downloadBtn.disabled = false;
+                
+                setStatus(`图片生成成功！尺寸: ${width}×${height}px`, 'success');
+            } catch (error) {
+                console.error('生成图片时出错:', error);
+                setStatus(`错误: ${error.message || '生成图片失败'}`, 'error');
+            } finally {
+                convertBtn.disabled = false;
+                convertBtn.innerHTML = '<span>生成图片</span>';
+            }
+        }
+        
+        // 下载图片
+        function downloadImage() {
+            if (!generatedImage) return;
+            
+            const link = document.createElement('a');
+            link.download = `markdown-preview-${Date.now()}.png`;
+            link.href = generatedImage;
+            link.click();
+            
+            setStatus('图片已下载到您的设备', 'success');
+        }
+        
+        // 设置状态信息
+        function setStatus(message, type = 'info') {
+            statusEl.textContent = message;
+            statusEl.style.color = type === 'success' ? '#28a745' : 
+                                   type === 'error' ? '#dc3545' : '#6c757d';
+            // 5秒后清除状态
+            setTimeout(() => {
+                if (statusEl.textContent === message) {
+                    statusEl.textContent = '';
+                }
+            }, 5000);
+        }
+        
+        // 处理模板文件选择
+        function handleTemplateFileSelect(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            // 检查文件类型
+            if (!file.name.endsWith('.md') && !file.name.endsWith('.txt')) {
+                templateStatus.textContent = '⚠️ 请只选择 .md 或 .txt 文件';
+                templateStatus.style.color = '#dc3545';
+                loadTemplateBtn.disabled = true;
+                return;
+            }
+            
+            // 读取文件内容
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                selectedTemplateContent = e.target.result;
+                templatePreview.textContent = selectedTemplateContent;
+                templateStatus.textContent = `已选择: ${file.name} (${(file.size / 1024).toFixed(1)} KB)`;
+                templateStatus.style.color = '#28a745';
+                loadTemplateBtn.disabled = false;
+            };
+            reader.onerror = function() {
+                templateStatus.textContent = '❌ 读取文件失败';
+                templateStatus.style.color = '#dc3545';
+                loadTemplateBtn.disabled = true;
+            };
+            reader.readAsText(file);
+        }
+        
+        // 加载模板到编辑器
+        function loadTemplateToEditor() {
+            if (!selectedTemplateContent) return;
+            
+            // 确认是否覆盖当前内容
+            if (markdownInput.value.trim() !== '') {
+                if (!confirm('当前编辑器内容将被覆盖，是否继续？')) {
+                    return;
+                }
+            }
+            
+            markdownInput.value = selectedTemplateContent;
+            renderPreview();
+            templateStatus.textContent = '✅ 模板已成功加载到编辑器';
+            templateStatus.style.color = '#28a745';
+        }
+        
+        // 加载示例内容
+        function loadSample() {
+            markdownInput.value = `# 数学公式与分栏示例
+
+## 数学公式演示
+
+行内公式：$E = mc^2$
+
+块级公式：
+$$\\int_{-\\infty}^{\\infty} e^{-x^2} dx = \\sqrt{\\pi}$$
+
+复杂公式：
+$$\\sum_{i=1}^{n} i = \\frac{n(n+1)}{2}$$
+
+矩阵：
+$$
+\\begin{pmatrix}
+a & b \\\\
+c & d
+\\end{pmatrix}
+$$
+
+## 分栏布局
+
+<div class="columns">
+  <div class="column">
+
+### 左栏：公式说明
+
+- **积分公式**:
+  $$\\int_a^b f(x)dx = F(b) - F(a)$$
+
+- **求和公式**:
+  $$\\sum_{k=1}^n k^2 = \\frac{n(n+1)(2n+1)}{6}$$
+
+- **欧拉公式**:
+  $$e^{i\\pi} + 1 = 0$$
+
+  </div>
+  <div class="column">
+
+### 右栏：应用场景
+
+\`\`\`python
+import numpy as np
+from scipy import integrate
+
+# 数值积分示例
+def gaussian(x):
+    return np.exp(-x**2)
+
+result, error = integrate.quad(gaussian, -np.inf, np.inf)
+print(f"积分结果: {result}")
+\`\`\`
+
+- 物理学中的应用
+- 工程计算
+- 统计分析
+
+  </div>
+</div>`;
+            renderPreview();
+            setStatus('已加载示例内容', 'success');
+        }
+        
+        // 清空所有内容
+        function clearAll() {
+            markdownInput.value = '';
+            previewContent.innerHTML = '';
+            resultImage.src = '';
+            resultImage.style.display = 'none';
+            downloadBtn.disabled = true;
+            generatedImage = null;
+            setStatus('内容已清空', 'success');
+        }
+        
+        // 重置设置
+        function resetSettings() {
+            canvasWidthInput.value = '800';
+            canvasHeightInput.value = '480';
+            fontSizeInput.value = '16';
+            paddingInput.value = '5';
+            bgColorInput.value = '#ffffff';
+            borderRadiusInput.value = '1';
+            updateCanvasSettings();
+            setStatus('设置已重置为默认值', 'success');
+        }
+        
+        // 事件监听
+        markdownInput.addEventListener('input', renderPreview);
+        convertBtn.addEventListener('click', convertToImage);
+        downloadBtn.addEventListener('click', downloadImage);
+        loadSampleBtn.addEventListener('click', loadSample);
+        clearAllBtn.addEventListener('click', clearAll);
+        resetSettingsBtn.addEventListener('click', resetSettings);
+        
+        // 自动调整窗口大小变化
+        window.addEventListener('resize', () => {
+            adjustContentToFit();
+        });
+        
+        // 监听画布内容变化，自动调整
+        const resizeObserver = new ResizeObserver(() => {
+            adjustContentToFit();
+        });
+        resizeObserver.observe(previewContent);
+        
+        // 初始化
+        updateCanvasSettings();
+        
+        // 设置默认内容
+        markdownInput.value = `# 开始使用
+
+## 本地模板功能
+
+1. 点击 "📁 选择模板文件" 选择 .md 或 .txt 文件
+2. 查看文件内容预览
+3. 点击 "加载模板" 将内容载入编辑器
+4. 编辑后生成图片
+
+## 支持的语法
+
+- 所有标准 Markdown
+- 数学公式：$E=mc^2$ 和 $$\\int_{-\\infty}^{\\infty} e^{-x^2} dx = \\sqrt{\\pi}$$
+- 分栏布局：<div class="columns">...</div>
+- HTML 标签和样式
+
+> 本工具完全在浏览器中运行，无需上传任何数据，保护您的隐私！`;
+        renderPreview();
+    </script>
+</body>
+</html>
